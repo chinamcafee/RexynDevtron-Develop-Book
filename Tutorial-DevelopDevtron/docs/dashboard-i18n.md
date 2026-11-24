@@ -1,175 +1,145 @@
 ---
 id: dashboard-i18n
-title: dashboard 多语种架构（i18n）
+title: dashboard 全量多语种架构（i18n）
 sidebar_position: 3
 ---
 
-# dashboard 多语种架构（i18n）
+# dashboard 全量多语种架构（i18n）
 
-这是 RexynOps 定制版 Devtron 的第一个功能性改造：**dashboard 原生支持中英双语，可随时切换、无需刷新、不丢当前页面**。
+这是 RexynOps 定制版 Devtron 的第一个功能性改造：**dashboard 的全部界面文案接入翻译管道，中文覆盖率 100%，新增一种语言只需增加一个语言文件**。
 
-"原生"的意思是：语言不是一层外挂的翻译插件，而是和路由、主题、权限一样，属于应用运行时的一部分——初始化早于首屏渲染，切换后 `<html lang>`、日期/数字格式、导航搜索关键词全部跟着变。
+"全量"不是"改了登录页和导航"——dashboard 有 767 个 tsx 文件、1510 条唯一界面文案。逐文件手工替换既做不完，也会让上游同步彻底失守。这里采用的是一套**构建期自动包裹 + 源文案词典 + 语言文件自动发现**的组合方案。
 
-## 一、目标与非目标
+## 一、最终结果
 
-| 目标 | 说明 |
+| 指标 | 数值 |
 | --- | --- |
-| 首批两种语言 | `en`（源语言，兜底）、`zh`（简体中文） |
-| 随时切换 | 登录页、左侧导航都能切；切换不刷新、不跳路由 |
-| 记住选择 | 存 `localStorage`，下次打开还是上次的语言 |
-| 跟随浏览器 | 首次访问按 `navigator.language` 自动选（`zh-CN`→中文） |
-| 增量迁移 | 未翻译的文案保持英文，不出现空白或 `login.submit` 这种裸 key |
-| 可扩展 | 新增语种只改 2 个文件，不动组件 |
+| 扫描文件 | 767 个（`src/**/*.tsx`） |
+| 含界面文案的文件 | 413 个 |
+| 文案出现次数 | 1983 处 |
+| 唯一文案 | 1510 条 |
+| 中文词典覆盖 | **1510 / 1510 = 100%** |
+| 对上游源文件的侵入 | **0 个文件**（除 7 个接线点） |
+| 新增语言成本 | 1 个文件 |
 
-非目标（明确不做，避免过度设计）：
+覆盖率可以用命令随时复算，不依赖人工统计：
 
-- 不做**按用户存到后端**的语言偏好（现在按浏览器维度；接 Rexyn 用户中心时再加）；
-- 不做 URL 前缀路由（`/zh/...`）——Devtron 的 SSO 回调和 `continue` 参数会把路径拼得很脆；
-- 不做运行时远程词条下发（词条随镜像发布，便于版本可追溯）。
+```bash
+cd $ROOT/dashboard
+yarn i18n:extract     # 打印统计并生成 i18n-report.json
+yarn i18n:check       # 覆盖率不足 100% 时以非 0 退出，可挂 CI
+```
 
-## 二、选型
+## 二、两层机制：为什么不能只有一套
 
-| 依赖 | 版本 | 作用 |
-| --- | --- | --- |
-| `i18next` | 27.x | 翻译核心：插值、复数、命名空间、回退 |
-| `react-i18next` | 18.x | `useTranslation`，语言变化触发重渲染 |
-| `i18next-browser-languagedetector` | 8.x | 从 localStorage / navigator 探测语言 |
+Devtron 的文案分两类，必须用两种方式处理：
 
-为什么不是 `react-intl`：Devtron 的文案大量是"运行时拼装"（导航树、模块名、状态枚举），i18next 的 `t(key, { defaultValue })` 回退语义更适合渐进式迁移；`FormattedMessage` 组件式 API 在改造存量代码时侵入性更大。
+| 类型 | 例子 | 方案 | 原因 |
+| --- | --- | --- | --- |
+| 存量与上游新增的裸文案 | `<span>Overview</span>`、`label="User ID"` | **构建期自动包裹** → `tx('Overview')` | 1510 条散落在 413 个文件里，手工改不完；上游每次合并还会带来新文案 |
+| 新写的、需要插值/复数的文案 | `t('login.ssoLoginWith', { provider })` | **结构化词条** → `locales/*.ts` 的 `messages` | 语序在不同语言里不同，拼接字符串必然出错 |
 
-为什么不自研：复数、插值转义、回退链、语言变化订阅这四件事都能自己写，但加起来就是 300 行需要长期维护的代码，而 i18next 已经被 React 生态验证过。
-
-## 三、目录与职责
+两者共用同一个语言来源，互不冲突：
 
 ```text
-src/i18n/
-├── constants.ts          语言清单、存储 key、<html lang>、Intl locale、语言归一化
-├── locales/
-│   ├── en.ts             源语言；同时用 typeof 推导出词条结构类型
-│   └── zh.ts             用 TranslationSchema 强类型约束，少一个 key 就编译报错
-├── index.ts              i18next 初始化（同步、内联资源）+ 统一导出
-├── useI18n.ts            组件里唯一入口：t / language / setLanguage / 格式化
-├── I18nProvider.tsx      把语言同步到 React 之外（<html lang>、document.title）
-├── LanguageSwitcher.tsx  下拉切换器（登录页、后续顶栏）
-├── LanguageSwitcher.scss
-├── navigation.ts         导航树读取时翻译（不改上游 constants.ts）
-└── format.ts             日期 / 数字 / 货币 / 相对时间
+localStorage / navigator
+        │
+        ▼
+  normalizeLanguage()
+        │
+        ├── t('login.submit')  → messages 树（结构化）
+        └── tx('Overview')     → auto 词典（源文案 → 译文）
 ```
 
-一条硬约定：**组件不直接 `import i18n`**。只有非 React 代码（请求拦截器、错误上报）才用 `i18n.t`，其余一律走 `useI18n()`，否则语言切换后组件不会重渲染。
+## 三、构建期自动包裹是怎么做的
 
-## 四、初始化：为什么不会有"英文闪一下"
+插件在 `tools/i18n/rexyn-i18n-auto-plugin.mjs`，以 `enforce: 'pre'` 挂在 Vite 上，对每个 `src/**/*.tsx` 做三件事：
 
-```tsx title="src/index.tsx"
-import App from './App'
-// 副作用导入：i18n 必须在任何组件渲染前完成初始化
-import { I18nProvider } from './i18n'
-
-createRoot(root).render(
-    <React.StrictMode>
-        <I18nProvider>
-            <QueryClientProvider>
-                <ThemeProvider>
-                    <RouterProvider router={router} />
-                </ThemeProvider>
-            </QueryClientProvider>
-        </I18nProvider>
-    </React.StrictMode>,
-)
+```text
+JSX 文本节点   <span>Overview</span>        →  <span>{__rexynTx("Overview")}</span>
+展示型属性     label="User ID"               →  label={__rexynTx("User ID")}
+注入导入       （文件首次命中时）             →  import { tx as __rexynTx } from "@I18n/runtime"
 ```
 
-关键在 `initAsync: false` + 资源内联：
+**为什么放在构建期，而不是一次性改源码：**
 
-```ts title="src/i18n/index.ts"
-i18n.use(LanguageDetector).use(initReactI18next).init({
-    resources,
+1. 上游每次 `merge` 都会带来新的英文文案，构建期处理能自动覆盖，不需要再跑一遍 codemod；
+2. `git diff upstream/develop` 里看不到 413 个文件的改动噪音，冲突面接近 0；
+3. `tsc` / `eslint` 仍然检查原始源码，转换不会引入类型错误；
+4. 想撤回这项能力，删掉插件一行即可，源码零残留。
+
+**跳过规则**（避免误伤）：
+
+| 规则 | 原因 |
+| --- | --- |
+| `src/i18n/**`、`.d.ts`、`*.test.*` | 词条文件本身不该被翻译 |
+| `<pre>` / `<code>` / `<kbd>` / `<samp>` 内的文本 | 代码样例、命令、YAML 片段不应翻译 |
+| 不含两个以上字母、长度 < 2 或 > 160 | 版本号、符号、长段落 |
+| 已被 `tx()` 包裹的节点 | 幂等 |
+
+**空白处理**：多行 JSX 文本会把换行和缩进折成单个空格（`replace(/\s+/g, ' ')`），行首/行尾的行内空格用显式的 `{' '}` 保留。这条规则在插件与提取脚本里必须完全一致，否则会出现"统计 100% 但运行时查不到"的假象——本项目踩过一次，已在两处统一。
+
+## 四、语言自动发现：一个文件 = 一种语言
+
+`src/i18n/locales/` 下的每个 `.ts` 文件都会被 `import.meta.glob` 自动注册，**不需要改任何注册代码**：
+
+```ts
+// src/i18n/locales/index.ts
+const discovered = import.meta.glob<LocaleModule>(['./*.ts', '!./index.ts'], { eager: true })
+
+export const LOCALES = Object.entries(discovered).reduce(/* 校验 meta/messages，按 code 建索引 */)
+export const SUPPORTED_LANGUAGES = Object.keys(LOCALES).sort()
+```
+
+一个语言文件由三部分组成：
+
+```ts
+export const meta = {
+    code: 'zh',
+    label: '简体中文',      // 切换器里显示的名字，用该语言自身书写
+    htmlLang: 'zh-CN',     // 写入 <html lang>
+    intlLocale: 'zh-CN',   // Intl 日期/数字格式化
+    direction: 'ltr',      // 预留给阿拉伯语等 RTL 语言
+}
+
+export const messages: TranslationSchema = { /* 结构化词条，类型由 en.ts 强制对齐 */ }
+
+export const auto: Record<string, string> = { /* 源文案 → 译文，供构建期包裹的 tx() 查表 */ }
+```
+
+`LANGUAGE_LABELS`、`HTML_LANG`、`INTL_LOCALE`、`TEXT_DIRECTION` 这些映射全部由 `meta` 派生，不再手写。**加一种语言 = 新建一个文件**，语言切换器、`<html lang>`、日期格式会自动跟上。
+
+## 五、运行时行为
+
+```ts
+i18n.init({
+    resources,                    // 由 LOCALES 自动汇总
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGES],
     load: 'currentOnly',
-    initAsync: false,        // 同步初始化，首屏就是正确语言
-    returnNull: false,
-    interpolation: { escapeValue: false },   // React 已转义，避免中文引号变实体
-    detection: {
-        order: ['localStorage', 'navigator'],
-        lookupLocalStorage: LANGUAGE_STORAGE_KEY,
-        caches: ['localStorage'],
-        convertDetectedLanguage: (language) => normalizeLanguage(language),
-    },
-    react: { useSuspense: false },
+    initAsync: false,             // 同步初始化，首屏就是正确语言
+    detection: { order: ['localStorage', 'navigator'], caches: ['localStorage'] },
 })
 ```
 
-如果以后词条涨到几百 KB，再改成 `initAsync: true` + 按语言动态 `import()`；那时候才需要 Suspense 和骨架屏。
+| 行为 | 说明 |
+| --- | --- |
+| 首次访问 | 按 `navigator.language` 选（`zh-CN`/`zh-TW`/`zh-Hans` 都归一化到 `zh`），并写回 localStorage |
+| 记住选择 | `localStorage["rexyn.devtron.language"]` |
+| 切换语言 | 写 localStorage → **整页刷新** |
+| `<html lang>` / `dir` | 由 `I18nProvider` 同步，影响字体回退、屏幕阅读器、RTL |
+| `document.title` | 走 `t('app.title')`，随语言变化 |
 
-## 五、语言判定与持久化
+:::warning 为什么要刷新页面
+`tx()` 是构建期注入的普通函数调用，不在 React 的订阅体系里，语言变化无法触发这些组件重渲染。用整页刷新换取"1510 条文案 100% 覆盖"，是这个取舍的核心。手动用 `t()` 的页面本来可以无刷新，但为了行为一致，统一走刷新。
+:::
 
-```ts
-SUPPORTED_LANGUAGES = ['en', 'zh']
-LANGUAGE_STORAGE_KEY = 'rexyn.devtron.language'   // 带 rexyn 前缀，避免与 Devtron 自身存储冲突
-```
+## 六、词条与翻译规范
 
-判定顺序：
-
-```text
-localStorage 有值？
-  ├── 是 → 归一化（zh / zh-CN / zh-Hans / zh-TW → zh；其余 → en）
-  └── 否 → navigator.language → 归一化 → 写回 localStorage
-```
-
-三个容易踩的点：
-
-1. **必须归一化**。`zh-CN`、`zh-TW`、`zh-Hans` 都是"中文"，但 i18next 默认会去找 `zh-CN` 资源，找不到就掉回英文。`normalizeLanguage` 把它们统一收敛到 `zh`。
-2. **`load: 'currentOnly'`**。否则 i18next 会尝试 `zh-CN → zh → en` 的链式回退，白白多查两次。
-3. **不要用 cookie**。Devtron 的 SSO 回调会跨域跳转，cookie 的 `SameSite` 和域名匹配很容易把语言偏好弄丢；`localStorage` 同源、无过期，够用。
-
-`I18nProvider` 负责把语言同步到 React 之外：
-
-```tsx
-useEffect(() => {
-    document.documentElement.lang = HTML_LANG[language]   // en | zh-CN
-    document.documentElement.dir = 'ltr'
-    document.title = DOCUMENT_TITLE[language]             // Devtron / Devtron 控制台
-}, [language])
-```
-
-`<html lang>` 不是装饰：浏览器翻译提示、屏幕阅读器发音、中文字体回退（避免把中文渲染成日文字形）都依赖它。
-
-## 六、词条规范
-
-### 6.1 key 用语义，不用文案
-
-```ts
-// 好
-login.submit: 'Login'
-// 坏：文案一改 key 就废
-'Login': 'Login'
-```
-
-### 6.2 结构由英文定义，中文强类型对齐
-
-```ts title="src/i18n/locales/en.ts"
-export const en = { /* ... */ }
-export type TranslationSchema = typeof en
-```
-
-```ts title="src/i18n/locales/zh.ts"
-export const zh: TranslationSchema = { /* 少一个 key 就 tsc 报错 */ }
-```
-
-这是这套方案里最值钱的一条：**漏翻译会在编译期暴露，而不是等用户切到中文才发现某处是英文**。
-
-### 6.3 插值不要拼接
-
-```ts
-// 推荐
-t('login.ssoLoginWith', { provider: item.name })   // "Login with {{provider}}" / "使用 {{provider}} 登录"
-// 禁止
-`Login with ${item.name}`
-```
-
-语序在不同语言里会变，拼接等于把语序写死。
-
-### 6.4 术语表（中文）
+1. **源文案即 key**（`auto` 词典）：与代码里的英文逐字一致，包括大小写和标点；改英文等于改 key，`i18n:extract` 会立刻把旧条目变成"缺失"。
+2. **key 不做语义化重命名**：存量代码的文案就是契约，重命名会让翻译历史断代。
+3. **结构化词条用语义 key**（`messages`）：`login.submit` 而不是 `'Login'`，方便插值与复数。
+4. **术语统一**：
 
 | 英文 | 中文 | 备注 |
 | --- | --- | --- |
@@ -182,155 +152,79 @@ t('login.ssoLoginWith', { provider: item.name })   // "Login with {{provider}}" 
 | Cluster | 集群 | |
 | Authorization | 授权 | 与 Authentication（认证）区分 |
 
-## 七、三类接入点
-
-### 7.1 普通组件
-
-```tsx
-const { t } = useI18n()
-
-<Button text={t('login.submit')} />
-<span>{t('login.ssoLoginWith', { provider: item.name })}</span>
-```
-
-### 7.2 导航树：不改上游常量
-
-`src/components/Navigation/constants.ts` 是上游文件，直接改它会让每次 `merge upstream/develop` 都冲突。做法是**读取时翻译**：
-
-```ts title="src/i18n/navigation.ts"
-export const translateNavigationList = (groups, t) =>
-    groups.map((group) => ({
-        ...group,
-        title: t(`nav.group.${group.id}`, { defaultValue: group.title }),
-        items: group.items?.map((item) => translateItem(item, t)),
-    }))
-```
-
-```tsx title="src/components/Navigation/Navigation.tsx"
-const NAVIGATION_LIST = useMemo(
-    () => translateNavigationList(getNavigationList(serverMode), t),
-    [serverMode, t],
-)
-```
-
-这套写法有三个好处：
-
-1. 上游改标题，缺词条时自动显示英文原文，不会空白；
-2. 新增导航项不需要同步改翻译文件才能上线；
-3. `git diff upstream/develop -- src/components/Navigation/constants.ts` 永远是空的。
-
-顺带把译名并进 `keywords`，中文搜索"应用组"也能命中。
-
-### 7.3 非 React 代码
-
-```ts
-import { i18n } from '@I18n'
-i18n.t('login.sessionExpired')
-```
-
-只推荐用在 Toast、埋点、请求拦截器这类拿不到 hook 的地方。
-
-## 八、日期、数字与货币
-
-不要在组件里直接 `new Intl.DateTimeFormat()`，否则切了中文日期还是 `Oct 28, 2026`：
-
-```tsx
-const { formatDateTime, formatNumber, formatCurrency } = useI18n()
-
-formatDateTime(row.deployedOn)          // 2026年10月28日 14:30 / Oct 28, 2026, 2:30 PM
-formatNumber(1234567)                   // 1,234,567
-formatCurrency(1234.5, 'CNY')           // ¥1,234.50
-```
-
-实现上都包了 `try/catch`，非法日期或未知货币不会把页面打挂，只回落成字符串。
-
-## 九、当前覆盖范围（诚实清单）
-
-已接入：
-
-| 位置 | 覆盖内容 |
-| --- | --- |
-| 登录页 | 副标题、SSO 按钮、管理员登录、表单标签/占位符/必填提示、帮助链接、会话过期提示 |
-| 左侧导航 | 6 个一级分组、31 个导航项与子项、搜索占位、无结果提示、OSS Plus 提示 |
-| 全局 | `<html lang>`、`document.title`、语言切换器（登录页 + 导航栏） |
-
-尚未接入（按此顺序推进）：
-
-1. 应用列表 / 应用详情（访问量最高）；
-2. 全局配置（表单密集，术语最集中）；
-3. 流水线编辑器（文案最多，建议最后做）；
-4. `devtron-fe-common-lib` 内部组件文案——它是独立 npm 包，需要单独接入 i18n，或用 `t` 包装后传入 props。
-
-:::tip 找硬编码文案的办法
-```bash
-# JSX 里的纯英文文本节点
-grep -rnE '>[A-Z][a-z]+( [A-Za-z]+)*<' src/Pages | head -40
-# 常见的 props 文案
-grep -rnE '(label|placeholder|text|title)="[A-Z][a-z]' src/Pages | head -40
-```
-:::
-
-## 十、与上游共存
-
-这次改造对上游文件的改动控制在 **7 个接入点**，新增代码全部在 `src/i18n/`：
-
-| 文件 | 改动 |
-| --- | --- |
-| `src/index.tsx` | 引入 `I18nProvider` 包裹根节点 |
-| `src/components/login/Login.tsx` | 文案替换 + 挂载切换器 |
-| `src/components/login/LoginForm.tsx` | 表单文案替换 |
-| `src/components/Navigation/Navigation.tsx` | 导航树翻译 + 语言入口 |
-| `vite.config.mts` / `tsconfig.json` | 新增 `@I18n` 别名 |
-| `package.json` / `yarn.lock` | 新增 3 个依赖 |
-
-上游同步时的冲突预判：`Navigation.tsx` 和 `Login.tsx` 是上游高频改动文件，冲突时**保留上游结构、把我们的 `t(...)` 重新贴回去**即可；`src/i18n/` 是纯新增，不会冲突。
-
-## 十一、验证清单
-
-```text
-[ ] 首次访问（清空 localStorage）→ 按浏览器语言选中/中文
-[ ] 登录页右上角切换 → 文案立即变，页面不刷新
-[ ] 登录后左导航底部语言入口 → 一级/二级导航全部切换
-[ ] 刷新页面 → 语言保持
-[ ] 检查 <html lang> → en / zh-CN
-[ ] 检查 document.title → Devtron / Devtron 控制台
-[ ] 中文下搜索"应用" → 能命中"应用管理"
-[ ] 切换语言后当前路由不变、表单已填内容不丢
-```
-
-工程侧：
+## 七、覆盖率工具与 CI
 
 ```bash
-cd $ROOT/dashboard
-npx tsc --noEmit                 # 0 error（词条类型对齐）
-npx eslint src/i18n --max-warnings 0
-npx vite build                   # 产物里能看到 en/zh 两份资源
+yarn i18n:extract   # i18n-report.json：总量、覆盖率、Top 20 文件、缺失清单
+yarn i18n:todo      # i18n-todo.json：待翻译清单（含出现次数）
+yarn i18n:check     # 覆盖率 < 100% 时退出码 1
 ```
 
-## 十二、新增一种语言
+建议把 `i18n:check` 挂到 CI 的 lint 阶段。上游合并后新增的英文文案会自动出现在缺失清单里，形成"翻译债可见"的机制，而不是等用户切到中文才发现。
 
-以日语为例，只需要两步：
+## 八、新增一种语言（只加一个文件）
+
+以日语为例：
 
 ```ts
-// 1. src/i18n/constants.ts
-export const SUPPORTED_LANGUAGES = ['en', 'zh', 'ja'] as const
-LANGUAGE_LABELS.ja = '日本語'
-HTML_LANG.ja = 'ja'
-INTL_LOCALE.ja = 'ja-JP'
+// src/i18n/locales/ja.ts
+import type { TranslationSchema } from './en'
 
-// 2. 新建 src/i18n/locales/ja.ts
-export const ja: TranslationSchema = { /* 按类型补全 */ }
+export const meta = {
+    code: 'ja',
+    label: '日本語',
+    htmlLang: 'ja',
+    intlLocale: 'ja-JP',
+    direction: 'ltr',
+}
+
+export const messages: TranslationSchema = { /* 结构必须与 en.ts 完全一致 */ }
+
+export const auto: Record<string, string> = { /* 按 i18n-todo.json 逐条翻译 */ }
 ```
 
-再在 `src/i18n/index.ts` 的 `resources` 里注册。`LanguageSwitcher` 会自动多出一项，不需要改组件。
+保存后：
 
-如果将来要做阿拉伯语等 RTL 语言，把 `I18nProvider` 里的 `dir` 从写死 `'ltr'` 改成按语言查表即可——这是刻意留的扩展点。
+- 语言切换器自动多出"日本語"；
+- `<html lang>`、日期/数字格式自动切到 `ja-JP`；
+- `yarn i18n:extract` 立刻按新语言计算覆盖率。
 
-## 十三、已知边界
+不需要改 `constants.ts`、`index.ts`、`I18nProvider`、切换器组件中的任何一行。
+
+## 九、与上游共存
+
+| 改动类型 | 文件数 | 说明 |
+| --- | --- | --- |
+| 新增 | 11 个 | `src/i18n/**`（9）、`tools/i18n/rexyn-i18n-auto-plugin.mjs`、`tools/i18n/extract.mjs` |
+| 接线 | 7 个 | `index.tsx`、`Login.tsx`、`LoginForm.tsx`、`Navigation.tsx`、`vite.config.mts`、`tsconfig.json`、`package.json` |
+| 依赖 | 3 个运行时 + 4 个构建期 | i18next 27 / react-i18next 18 / browser-languagedetector 8；@babel/{parser,traverse,generator,types} |
+
+上游合并后的标准动作：
+
+```bash
+git merge upstream/develop
+yarn i18n:check        # 新增文案会出现在缺失清单
+# 补完 zh.ts 的 auto 词条，再提交
+```
+
+## 十、已知边界
 
 | 边界 | 现状 | 后续方案 |
 | --- | --- | --- |
-| 后端返回的错误消息 | 仍是英文（`ServerErrors` 的 message 来自 API） | 在 `showError` 层做错误码→文案映射，不改后端 |
-| `devtron-fe-common-lib` 组件内文案 | 仍是英文 | 给 common-lib 接入同一套 i18n，或在其上层包一层 |
-| 富文本/含链接的句子 | 暂未使用 `<Trans>` | 文案稳定后用 `Trans` 组件 |
-| 语言偏好的用户级同步 | 仅浏览器维度 | 接 Rexyn 用户中心后，登录时拉取偏好并写入 localStorage |
+| 被表达式切开的句子 | `Deploy {name} now` 会拆成两段分别翻译，中文语序可能生硬 | 改为 `t('deploy.action', { name })` 结构化词条，逐句人工改造 |
+| 动态拼接的字符串（变量里的英文） | 构建期不处理 | 用 `t()` / `tx()` 显式包裹 |
+| `devtron-fe-common-lib` 组件内部文案 | 仍是英文（独立 npm 包） | 给 common-lib 接入同一套 i18n，或在 dashboard 层包一层 |
+| 后端返回的错误消息 | 仍是英文（来自 API） | 在 `showError` 做错误码→文案映射 |
+| 语言偏好的用户级同步 | 仅浏览器维度 | 接 Rexyn 用户中心后登录时拉取偏好 |
+
+## 十一、验证记录
+
+```text
+[✓] tsc --noEmit                     0 error
+[✓] eslint src/i18n --max-warnings 0 0 error
+[✓] vite build                       成功（插件处理 2479 个模块，耗时约 2s）
+[✓] i18n:extract                     1510/1510，覆盖率 100.0%
+[✓] 产物包含 en/zh 两套词条与 tx 运行时
+```
+
+构建期插件的耗时：2479 次 transform 调用约 2 秒（占整体构建约 27%），可以接受；如后续明显变慢，可加 `id` 白名单只处理 `src/Pages` 与 `src/components`。
