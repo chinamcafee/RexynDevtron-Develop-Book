@@ -16,7 +16,7 @@ sidebar_position: 3
 | --- | --- |
 | 扫描文件（dashboard） | 1222 个（`src/**/*.ts,tsx`，排除 mock/fixture） |
 | 扫描文件（common-lib） | 925 个（`devtron-fe-common-lib/src`） |
-| 唯一文案 | 2281（dashboard）+ 511（common-lib） |
+| 唯一文案 | 2452（dashboard）+ 602（common-lib） |
 | 中文词典覆盖 | **100%**（两处均 100%） |
 | 对上游源文件的侵入 | **0 个文件**（除 7 个接线点） |
 | 新增语言成本 | 1 个文件 |
@@ -121,7 +121,7 @@ yarn i18n:extract
 node tools/i18n/merge-translations.mjs /tmp/trans1.json
 ```
 
-当前 common-lib 收录 511 条，覆盖其 `src` 下的 JSX 文本、展示型属性与常量对象。
+当前 common-lib 收录 602 条，覆盖其 `src` 下的 JSX 文本、展示型属性与常量对象。
 
 ## 四、语言自动发现：一个文件 = 一种语言
 
@@ -267,7 +267,7 @@ yarn i18n:check        # 新增文案会出现在缺失清单
 [✓] tsc --noEmit                     0 error
 [✓] eslint src/i18n --max-warnings 0 0 error
 [✓] vite build                       成功（插件处理 2479 个模块，耗时约 2s）
-[✓] i18n:extract                     dashboard 2280/2281 + common-lib 511/511，覆盖率 100%
+[✓] i18n:extract                     dashboard 2452/2452 + common-lib 602/602，覆盖率 100%
 [✓] moment / dayjs locale 随语言初始化（相对时间不再出现 A Few Seconds Ago）
 [✓] 产物包含 en/zh 两套词条与 tx 运行时
 ```
