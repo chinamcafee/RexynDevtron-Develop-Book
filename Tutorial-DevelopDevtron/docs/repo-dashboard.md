@@ -155,6 +155,36 @@ SPA 的经典问题。镜像里的 `nginx.conf` 已经配置了 `try_files $uri 
 
 接新页面的写法、词条规范、增量迁移顺序，见[dashboard 多语种架构](./dashboard-i18n)。
 
+## RexynOps 的前端裁剪
+
+### 为什么移除 Upgrade to OSS Plus
+
+调研结论：**OSS Plus 是付费支持计划（$499/月起，含不限集群数与优先支持），不是软件能力**。源码里只有营销入口与弹窗（`UpgradeToOSSPlusDialog`、导航项），没有任何对应的功能开关或后端实现，因此无法"解锁"。
+
+处理：移除左侧导航入口与弹窗挂载，`upgrade-to-oss-plus` 相关组件保留但不再渲染（上游同步时不产生冲突）。
+
+### Release 日志改为读取本仓库
+
+原实现请求 Devtron 中央 API：
+
+```text
+${CENTRAL_API_ENDPOINT}/v2/release/notes?repo=<installationType 映射的上游仓库>&serverVersion=...
+```
+
+这会把上游发行日志展示到我们的控制台，和定制版实际内容不一致。现改为：
+
+```text
+https://api.github.com/repos/chinamcafee/devtron/releases?per_page=10
+```
+
+映射字段：`tag_name → releaseName/tagName`、`body → body`、`created_at/published_at/html_url` 一并带出。
+
+注意事项：
+
+1. 匿名调用 GitHub API 限额 60 次/小时，页面只在打开 Stack Manager → Releases 时请求，够用；
+2. 如果仓库改为私有，浏览器直连会 401，需要改为后端代理；
+3. 本仓库还没有 Release 时，列表为空属正常现象。
+
 ## 前端开发的两个实用约定
 
 1. **组件优先放 common-lib**：如果组件会被多个页面用，放 `devtron-fe-common-lib`，否则后续会被要求迁移；
