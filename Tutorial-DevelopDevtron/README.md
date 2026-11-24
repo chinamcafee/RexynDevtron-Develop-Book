@@ -40,6 +40,7 @@ npm run serve        # 预览构建产物
 第四部分 · 前端
   repo-dashboard         前端控制台
   repo-fe-common-lib     前端公共组件库
+  dashboard-i18n         多语种架构（中英双语）
 
 第五部分 · 周边仓库
   repo-inception         安装与升级的 Operator

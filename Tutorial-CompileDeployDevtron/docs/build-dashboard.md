@@ -13,6 +13,10 @@ dashboard (React SPA)  ──depends on──►  @devtron-labs/devtron-fe-commo
                                           version: 4.0.14-pre-2
 ```
 
+:::info RexynOps 定制版多了 3 个依赖
+`dashboard` 已接入多语种（`i18next` / `react-i18next` / `i18next-browser-languagedetector`），并新增了 `src/i18n/` 目录。**这不会改变构建方式**：仍然是一条 `yarn install` + `yarn build`，词条随 JS 一起打包（构建产物里能看到独立的 `i18n-*.js` chunk）。首次编译前务必先 `yarn install`，否则 `@I18n` 别名会解析失败。
+:::
+
 ## 1. 先看原 Dockerfile 能不能直接用
 
 ```bash

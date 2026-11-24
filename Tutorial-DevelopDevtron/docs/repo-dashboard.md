@@ -147,6 +147,13 @@ SPA 的经典问题。镜像里的 `nginx.conf` 已经配置了 `try_files $uri 
 | 加全局提示/弹窗 | `src/components/` 或 common-lib |
 | 改主题色 | `src/css/` + `:root` 变量 |
 | 加一个新的 API service | `src/services/` |
+| 加/改多语种文案 | `src/i18n/locales/`（见[dashboard 多语种架构](./dashboard-i18n)） |
+
+## 多语种（RexynOps 定制）
+
+这个 fork 的 dashboard 已经原生支持中英双语：语言在 `src/i18n/` 里集中管理，登录页与左侧导航都能实时切换，选择记在 `localStorage`。改造只碰了 7 个上游文件，新增代码全部隔离在 `src/i18n/`，上游同步时冲突面很小。
+
+接新页面的写法、词条规范、增量迁移顺序，见[dashboard 多语种架构](./dashboard-i18n)。
 
 ## 前端开发的两个实用约定
 

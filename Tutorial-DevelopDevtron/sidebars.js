@@ -39,7 +39,7 @@ const sidebars = {
       type: 'category',
       label: '第四部分 · 前端',
       collapsed: false,
-      items: ['repo-dashboard', 'repo-fe-common-lib'],
+      items: ['repo-dashboard', 'repo-fe-common-lib', 'dashboard-i18n'],
     },
     {
       type: 'category',
