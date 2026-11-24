@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#07101f"/>
+  <text x="80" y="280" font-family="Helvetica, Arial, sans-serif" font-size="68" font-weight="700" fill="#ffffff">Devtron 源码剖析与二次开发</text>
+  <text x="80" y="360" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="#7ee0c0">按仓库拆解生态，找到每一个可扩展点</text>
+  <rect x="80" y="420" width="520" height="6" fill="#12b886"/>
+</svg>

@@ -1,0 +1,28 @@
+# ---- Node / Yarn ----
+node_modules/
+.pnp.*
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.yarn/build-state.yml
+
+# ---- Docusaurus 生成物 ----
+build/
+.docusaurus/
+.cache-loader/
+**/.docusaurus/
+**/build/
+
+# ---- 日志与临时文件 ----
+*.log
+npm-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ---- 本地环境 ----
+.env
+.env.local
+.env.*.local

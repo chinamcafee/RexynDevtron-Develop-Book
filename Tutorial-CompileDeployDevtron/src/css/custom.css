@@ -1,0 +1,37 @@
+/* 全局样式：在 Docusaurus 默认主题上做少量定制 */
+:root {
+  --ifm-color-primary: #1b6bff;
+  --ifm-color-primary-dark: #0f5cea;
+  --ifm-color-primary-darker: #0e57dd;
+  --ifm-color-primary-darkest: #0b47b6;
+  --ifm-color-primary-light: #3a80ff;
+  --ifm-color-primary-lighter: #4a8bff;
+  --ifm-color-primary-lightest: #77a8ff;
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #6ea8ff;
+  --ifm-color-primary-dark: #4a8bff;
+  --ifm-color-primary-darker: #3a80ff;
+  --ifm-color-primary-darkest: #1b6bff;
+  --ifm-color-primary-light: #92bbff;
+  --ifm-color-primary-lighter: #a6c8ff;
+  --ifm-color-primary-lightest: #d0e0ff;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* 表格：保留 Docusaurus 默认的横向滚动，只补中文断行 */
+table th,
+table td {
+  word-break: break-word;
+}
+
+/* 命令行提示块 */
+.command-note {
+  border-left: 4px solid var(--ifm-color-primary);
+  padding: 0.75rem 1rem;
+  background: var(--ifm-background-surface-color);
+  margin-bottom: 1rem;
+}
