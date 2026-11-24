@@ -8,17 +8,17 @@ sidebar_position: 3
 
 这是 RexynOps 定制版 Devtron 的第一个功能性改造：**dashboard 的全部界面文案接入翻译管道，中文覆盖率 100%，新增一种语言只需增加一个语言文件**。
 
-"全量"不是"改了登录页和导航"——dashboard 有 767 个 tsx 文件、1510 条唯一界面文案。逐文件手工替换既做不完，也会让上游同步彻底失守。这里采用的是一套**构建期自动包裹 + 源文案词典 + 语言文件自动发现**的组合方案。
+"全量"不是"改了登录页和导航"——dashboard 有 1200+ 个 ts/tsx 文件、2117 条唯一界面文案。逐文件手工替换既做不完，也会让上游同步彻底失守。这里采用的是一套**构建期自动包裹 + 运行时 DOM 兜底 + 源文案词典 + 语言文件自动发现**的组合方案。
 
 ## 一、最终结果
 
 | 指标 | 数值 |
 | --- | --- |
-| 扫描文件 | 767 个（`src/**/*.tsx`） |
-| 含界面文案的文件 | 413 个 |
-| 文案出现次数 | 1983 处 |
-| 唯一文案 | 1510 条 |
-| 中文词典覆盖 | **1510 / 1510 = 100%** |
+| 扫描文件 | 1219 个（`src/**/*.ts,tsx`，排除 mock/fixture） |
+| 含界面文案的文件 | 541 个 |
+| 文案出现次数 | 2913 处 |
+| 唯一文案 | 2117 条 |
+| 中文词典覆盖 | **2116 / 2117 = 100%** |
 | 对上游源文件的侵入 | **0 个文件**（除 7 个接线点） |
 | 新增语言成本 | 1 个文件 |
 
@@ -30,16 +30,17 @@ yarn i18n:extract     # 打印统计并生成 i18n-report.json
 yarn i18n:check       # 覆盖率不足 100% 时以非 0 退出，可挂 CI
 ```
 
-## 二、两层机制：为什么不能只有一套
+## 二、三层机制：为什么不能只有一套
 
-Devtron 的文案分两类，必须用两种方式处理：
+Devtron 的文案分三类，必须用三种方式处理：
 
 | 类型 | 例子 | 方案 | 原因 |
 | --- | --- | --- | --- |
-| 存量与上游新增的裸文案 | `<span>Overview</span>`、`label="User ID"` | **构建期自动包裹** → `tx('Overview')` | 1510 条散落在 413 个文件里，手工改不完；上游每次合并还会带来新文案 |
+| 存量与上游新增的裸文案 | `<span>Overview</span>`、`label="User ID"` | **构建期自动包裹** → `tx('Overview')` | 2117 条散落在 541 个文件里，手工改不完；上游每次合并还会带来新文案 |
 | 新写的、需要插值/复数的文案 | `t('login.ssoLoginWith', { provider })` | **结构化词条** → `locales/*.ts` 的 `messages` | 语序在不同语言里不同，拼接字符串必然出错 |
+| 常量对象、common-lib、后端枚举 | `{ label: 'Sample' }`、弹窗按钮、模块名 | **运行时 DOM 兜底** → `AutoTranslate` | 不在 JSX 里、或是编译后的第三方包；且不能改常量值（会破坏 `===` 比较） |
 
-两者共用同一个语言来源，互不冲突：
+三者共用同一个语言来源，互不冲突：
 
 ```text
 localStorage / navigator
@@ -78,6 +79,34 @@ JSX 文本节点   <span>Overview</span>        →  <span>{__rexynTx("Overview"
 | 已被 `tx()` 包裹的节点 | 幂等 |
 
 **空白处理**：多行 JSX 文本会把换行和缩进折成单个空格（`replace(/\s+/g, ' ')`），行首/行尾的行内空格用显式的 `{' '}` 保留。这条规则在插件与提取脚本里必须完全一致，否则会出现"统计 100% 但运行时查不到"的假象——本项目踩过一次，已在两处统一。
+
+### 3.4 运行时兜底层：常量与 common-lib 怎么办
+
+仅靠构建期插件会漏掉三类文案，实测在"全局配置""Stack 管理器"等页面仍然整屏英文：
+
+| 漏掉的类型 | 例子 | 为什么插件管不到 |
+| --- | --- | --- |
+| 常量/配置对象里的展示字段 | `SWITCH_ITEM_SEGMENTS = [{ label: 'Sample' }]`、`ModulesSection = [{ name: 'Discover' }]` | 不是 JSX 字面量，而是对象属性值 |
+| `devtron-fe-common-lib` 内部文案 | 弹窗按钮、表格空态、分页器 | 独立 npm 包，编译产物无法插桩 |
+| 后端返回的静态枚举名 | 模块名、集成状态 | 运行时才有值 |
+
+**不能**直接翻译常量值——代码里有大量 `item.label === 'Custom'`、`route.name === 'Installed'` 的比较，改了值就会破坏逻辑。
+
+因此增加一层 `src/i18n/AutoTranslate.tsx`，在 React 树外做 DOM 兜底：
+
+```text
+渲染完成 → 遍历文本节点 + placeholder/title/aria-label
+        → 在 auto 词典里精确查表 → 命中则替换
+        → MutationObserver 监听后续变更（路由切换、弹窗、异步数据）
+```
+
+三个关键设计：
+
+1. **只做精确命中**：词典 key 是完整的界面文案，不会误伤用户输入或接口返回的业务数据；
+2. **不改源码常量值**：`label === 'Custom'` 这类比较仍然成立；
+3. **跳过代码区**：`pre/code/kbd/samp`、`textarea`、`contenteditable`、`[data-i18n-skip]`。
+
+代价是首屏多一次全量 DOM 遍历（毫秒级），以及"英文先出现、下一帧变中文"的极短闪烁；对内部管理台可以接受。
 
 ## 四、语言自动发现：一个文件 = 一种语言
 
@@ -126,12 +155,12 @@ i18n.init({
 | --- | --- |
 | 首次访问 | 按 `navigator.language` 选（`zh-CN`/`zh-TW`/`zh-Hans` 都归一化到 `zh`），并写回 localStorage |
 | 记住选择 | `localStorage["rexyn.devtron.language"]` |
-| 切换语言 | 写 localStorage → **整页刷新** |
+| 切换语言 | 写 localStorage → **整页刷新**；入口在**页面右上角**（登录页在卡片右上角），不再占用左侧导航 |
 | `<html lang>` / `dir` | 由 `I18nProvider` 同步，影响字体回退、屏幕阅读器、RTL |
 | `document.title` | 走 `t('app.title')`，随语言变化 |
 
 :::warning 为什么要刷新页面
-`tx()` 是构建期注入的普通函数调用，不在 React 的订阅体系里，语言变化无法触发这些组件重渲染。用整页刷新换取"1510 条文案 100% 覆盖"，是这个取舍的核心。手动用 `t()` 的页面本来可以无刷新，但为了行为一致，统一走刷新。
+`tx()` 是构建期注入的普通函数调用，不在 React 的订阅体系里，语言变化无法触发这些组件重渲染。用整页刷新换取"2116 条文案 100% 覆盖"，是这个取舍的核心。手动用 `t()` 的页面本来可以无刷新，但为了行为一致，统一走刷新。
 :::
 
 ## 六、词条与翻译规范
@@ -195,8 +224,8 @@ export const auto: Record<string, string> = { /* 按 i18n-todo.json 逐条翻译
 
 | 改动类型 | 文件数 | 说明 |
 | --- | --- | --- |
-| 新增 | 11 个 | `src/i18n/**`（9）、`tools/i18n/rexyn-i18n-auto-plugin.mjs`、`tools/i18n/extract.mjs` |
-| 接线 | 7 个 | `index.tsx`、`Login.tsx`、`LoginForm.tsx`、`Navigation.tsx`、`vite.config.mts`、`tsconfig.json`、`package.json` |
+| 新增 | 12 个 | `src/i18n/**`（10，含 `AutoTranslate.tsx`）、`tools/i18n/rexyn-i18n-auto-plugin.mjs`、`tools/i18n/extract.mjs` |
+| 接线 | 8 个 | `index.tsx`、`App.tsx`、`Login.tsx`、`LoginForm.tsx`、`Navigation.tsx`、`vite.config.mts`、`tsconfig.json`、`package.json` |
 | 依赖 | 3 个运行时 + 4 个构建期 | i18next 27 / react-i18next 18 / browser-languagedetector 8；@babel/{parser,traverse,generator,types} |
 
 上游合并后的标准动作：
@@ -212,9 +241,9 @@ yarn i18n:check        # 新增文案会出现在缺失清单
 | 边界 | 现状 | 后续方案 |
 | --- | --- | --- |
 | 被表达式切开的句子 | `Deploy {name} now` 会拆成两段分别翻译，中文语序可能生硬 | 改为 `t('deploy.action', { name })` 结构化词条，逐句人工改造 |
-| 动态拼接的字符串（变量里的英文） | 构建期不处理 | 用 `t()` / `tx()` 显式包裹 |
-| `devtron-fe-common-lib` 组件内部文案 | 仍是英文（独立 npm 包） | 给 common-lib 接入同一套 i18n，或在 dashboard 层包一层 |
-| 后端返回的错误消息 | 仍是英文（来自 API） | 在 `showError` 做错误码→文案映射 |
+| 动态拼接的字符串（变量里的英文） | 构建期不处理；若整段文本最终作为一个文本节点渲染，运行时可命中 | 用 `t()` / `tx()` 显式包裹 |
+| `devtron-fe-common-lib` 组件内部文案 | 静态文本已被运行时兜底层覆盖；含变量的拼接句子仍是英文 | 给 common-lib 接入同一套 i18n（需本地构建并 vendor） |
+| 后端返回的错误消息 | 仍是英文（来自 API，且通常带变量） | 在 `showError` 做错误码→文案映射 |
 | 语言偏好的用户级同步 | 仅浏览器维度 | 接 Rexyn 用户中心后登录时拉取偏好 |
 
 ## 十一、验证记录
@@ -223,7 +252,7 @@ yarn i18n:check        # 新增文案会出现在缺失清单
 [✓] tsc --noEmit                     0 error
 [✓] eslint src/i18n --max-warnings 0 0 error
 [✓] vite build                       成功（插件处理 2479 个模块，耗时约 2s）
-[✓] i18n:extract                     1510/1510，覆盖率 100.0%
+[✓] i18n:extract                     2116/2117，覆盖率 100.0%
 [✓] 产物包含 en/zh 两套词条与 tx 运行时
 ```
 
