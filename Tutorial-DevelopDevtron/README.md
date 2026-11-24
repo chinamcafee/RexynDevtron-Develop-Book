@@ -23,6 +23,7 @@ npm run serve        # 预览构建产物
 第二部分 · devtron（核心）
   repo-devtron           核心仓库的骨架
   devtron-api            API 层与路由
+  backend-error-codes    错误码、出口分档与前端多语言
   devtron-domain         业务域：pipeline / app / chart / argo
   devtron-wire           wire 依赖注入与扩展点
   devtron-inner-charts   内置 Chart 与部署模板

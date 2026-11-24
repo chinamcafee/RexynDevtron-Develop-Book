@@ -15,6 +15,7 @@ const sidebars = {
       items: [
         'repo-devtron',
         'devtron-api',
+        'backend-error-codes',
         'devtron-domain',
         'devtron-wire',
         'devtron-inner-charts',
