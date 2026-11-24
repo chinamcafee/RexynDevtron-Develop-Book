@@ -93,6 +93,7 @@ util.NewBusinessApiError(404, util.ErrCodeAppNotFound, params, userMessage, inte
 | `validator.ValidationErrors` | `VALIDATION_FAILED` |
 | K8s `StatusError` | `K8S_FORBIDDEN` / `K8S_NOT_FOUND` / `K8S_CONFLICT` / `K8S_INVALID` |
 | K8s 超时 / 服务不可用 | `UPSTREAM_TIMEOUT` / `UPSTREAM_UNAVAILABLE` |
+| 登录态失效（vendor 中间件直接写的 401） | `UNAUTHORIZED`（由 HTTP 入口中间件补写） |
 | 其余裸错误、`multierror`、`UnexpectedObjectError` | `UNKNOWN` + `params.detail` |
 
 裸错误的英文原文不会被丢弃，而是放进 `params.detail`，前端默认只显示通用文案，需要排障时可以取用。
@@ -165,7 +166,7 @@ businessCode 词典（带 params）→ 后端英文 userMessage → 组件自身
 | `code` | 不变 | 现有 `code === "400"` 分支不受影响 |
 | `userMessage` / `internalMessage` | 后端仍返回英文 | 老前端展示不变 |
 | 函数签名 | `NewApiError` 等不变 | 现有调用点无需修改 |
-| OpenAPI specs | 需补两个字段 | 否则契约文档落后 |
+| OpenAPI specs | 已补 49 处错误示例（9 个文件） | 新增端点仍需同步 |
 
 ## 八、新增一个错误码
 
@@ -186,7 +187,7 @@ businessCode 词典（带 params）→ 后端英文 userMessage → 组件自身
 | K8s/DB 原始错误详情 | 外壳中文，详情英文（`params.detail`） | 增加"查看详情"折叠展示 |
 | 异步通知（邮件/Slack） | 未覆盖 | 用户级 language 偏好，发送时读取 |
 | 未登记的裸错误 | 落到 `UNKNOWN` | 按埋点频次补 L2 码 |
-| OpenAPI specs | 尚未补字段 | 下一批随契约测试一起补 |
+| 认证 401 | 由 `middleware.WithUnauthorizedBusinessCode` 在入口补码，不改 vendor | — |
 
 ## 十、验证记录
 
@@ -196,4 +197,6 @@ businessCode 词典（带 params）→ 后端英文 userMessage → 组件自身
 [✓] go build ./api/... ./internal/... ./pkg/pipeline/           （mock 包为上游基线问题，未纳入）
 [✓] dashboard: tsc --noEmit / eslint --max-warnings 0 / vite build
 [✓] 生成 31 个码的前端词典（10 个 L1 + 21 个 L2）
+[✓] specs：49 处错误示例补 businessCode（9 个文件），89 个 YAML 全部可解析
+[✓] 401 中间件：单测覆盖"补码"与"200 直通"两条路径
 ```
