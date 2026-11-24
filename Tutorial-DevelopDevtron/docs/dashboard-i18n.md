@@ -14,11 +14,10 @@ sidebar_position: 3
 
 | 指标 | 数值 |
 | --- | --- |
-| 扫描文件 | 1219 个（`src/**/*.ts,tsx`，排除 mock/fixture） |
-| 含界面文案的文件 | 541 个 |
-| 文案出现次数 | 2913 处 |
-| 唯一文案 | 2117 条 |
-| 中文词典覆盖 | **2116 / 2117 = 100%** |
+| 扫描文件（dashboard） | 1222 个（`src/**/*.ts,tsx`，排除 mock/fixture） |
+| 扫描文件（common-lib） | 925 个（`devtron-fe-common-lib/src`） |
+| 唯一文案 | 2281（dashboard）+ 511（common-lib） |
+| 中文词典覆盖 | **100%**（两处均 100%） |
 | 对上游源文件的侵入 | **0 个文件**（除 7 个接线点） |
 | 新增语言成本 | 1 个文件 |
 
@@ -108,6 +107,22 @@ JSX 文本节点   <span>Overview</span>        →  <span>{__rexynTx("Overview"
 
 代价是首屏多一次全量 DOM 遍历（毫秒级），以及"英文先出现、下一帧变中文"的极短闪烁；对内部管理台可以接受。
 
+**词典必须显式覆盖 common-lib**：DOM 层只做精确命中，词典里没有的文案不会翻译。提取 common-lib 文案的方式：
+
+```bash
+I18N_ROOT=../devtron-fe-common-lib \
+I18N_ZH_LOCALE=$PWD/src/i18n/locales/zh.ts \
+yarn i18n:extract
+```
+
+翻译结果写成 JSON 后合并：
+
+```bash
+node tools/i18n/merge-translations.mjs /tmp/trans1.json
+```
+
+当前 common-lib 收录 511 条，覆盖其 `src` 下的 JSX 文本、展示型属性与常量对象。
+
 ## 四、语言自动发现：一个文件 = 一种语言
 
 `src/i18n/locales/` 下的每个 `.ts` 文件都会被 `import.meta.glob` 自动注册，**不需要改任何注册代码**：
@@ -155,7 +170,7 @@ i18n.init({
 | --- | --- |
 | 首次访问 | 按 `navigator.language` 选（`zh-CN`/`zh-TW`/`zh-Hans` 都归一化到 `zh`），并写回 localStorage |
 | 记住选择 | `localStorage["rexyn.devtron.language"]` |
-| 切换语言 | 写 localStorage → **整页刷新**；入口在**页面右上角**（登录页在卡片右上角），不再占用左侧导航 |
+| 切换语言 | 写 localStorage → **整页刷新**；入口通过 portal 插入头部动作区，与 Create / 头像**线性排列**（登录页在卡片右上角） |
 | `<html lang>` / `dir` | 由 `I18nProvider` 同步，影响字体回退、屏幕阅读器、RTL |
 | `document.title` | 走 `t('app.title')`，随语言变化 |
 
@@ -252,7 +267,8 @@ yarn i18n:check        # 新增文案会出现在缺失清单
 [✓] tsc --noEmit                     0 error
 [✓] eslint src/i18n --max-warnings 0 0 error
 [✓] vite build                       成功（插件处理 2479 个模块，耗时约 2s）
-[✓] i18n:extract                     2116/2117，覆盖率 100.0%
+[✓] i18n:extract                     dashboard 2280/2281 + common-lib 511/511，覆盖率 100%
+[✓] moment / dayjs locale 随语言初始化（相对时间不再出现 A Few Seconds Ago）
 [✓] 产物包含 en/zh 两套词条与 tx 运行时
 ```
 
