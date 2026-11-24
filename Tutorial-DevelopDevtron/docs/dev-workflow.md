@@ -191,6 +191,44 @@ cd $ROOT/dashboard && yarn lint
 
 这个流程的关键是**先用最快的方式验证逻辑（第 5 步），再做重的那一步（第 6 步）**。
 
+## 提交前校验：pre-push 规范钩子
+
+改了后端接口却忘了更新 `specs/`，是这套代码最容易积累的债。仓库内置了一个 **pre-push** 钩子，只在本机生效，不依赖 GitHub 或任何托管平台的 CI 能力。
+
+安装（每台机器一次）：
+
+```bash
+cd $ROOT/devtron
+make hooks          # 等价于 git config core.hooksPath scripts/hooks
+```
+
+规则：
+
+| 触发条件 | 要求 |
+| --- | --- |
+| 改了 `api/restHandler/**` 或 `api/router/**` | 同一次 push 里必须包含 `specs/**` 的改动 |
+| 改了 `internal/util/errorcodes.go` | 必须同步改 `contracts/error-codes.yaml` |
+| 其他改动 | 直接放行 |
+
+命中失败时会给出手臂清单和修复提示；纯重构、注释、重命名可以显式跳过：
+
+```bash
+SKIP_SPEC_CHECK=1 git push
+```
+
+调试钩子本身（不实际 push）：
+
+```bash
+SPEC_CHECK_BASE=<sha> SPEC_CHECK_HEAD=<sha> scripts/hooks/pre-push
+```
+
+:::note 两个边界
+1. 钩子是**本地**的：换机器、换 clone 都要重新 `make hooks`；`--no-verify` 也能绕过，它的定位是"提前提醒"，不是强制门禁。
+2. 脚本只做 `git diff --name-only`，不编译 Go、不联网，单次执行在 1 秒内。
+:::
+
+以后如果仓库迁到 GitLab / Gitea / 自建服务，直接把 `scripts/hooks/pre-push` 挂到对应平台的 CI 即可，规则逻辑不用重写。
+
 ## 提交：落在 rexyn-dev，不回上游
 
 这套代码的定位是 RexynOps 的定制发行版，**不向上游提 PR**。提交路径固定：
