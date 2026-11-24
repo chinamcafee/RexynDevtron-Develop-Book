@@ -20,7 +20,7 @@ npm run build                     # 产物在 build/
 
 ## 与其他仓库的关系
 
-本仓库是 `DevtronProjects` 项目群的**叙述层**；事实层（仓库清单、`rexyn-dev` 基线、镜像与前缀约定、文档同步契约）在项目群根目录的 `PROJECT-GROUP-MEMORY.md`。
+本仓库是 `DevtronProjects` 项目群的**叙述层**；事实层拆在各代码仓库根目录的 `AGENTS.md`（仓库清单、`rexyn-dev` 基线、镜像约定、该仓库的文档映射），文档侧的同步规则见本仓库 `AGENTS.md`。
 
 - 代码仓库：`devtron`、`devtron-services`、`dashboard`、`devtron-fe-common-lib`、`inception`、`migrator`、`notifier`、`charts`、`kubectl`、`dex`、`chart-versions-fix`（均为 `rexyn-dev` 分支）
 - 自建镜像统一前缀：`rexyn-devtron/*`
@@ -30,7 +30,7 @@ npm run build                     # 产物在 build/
 
 任何代码仓库的 `rexyn-dev` 有重要变更（新增 API、改业务域、加迁移、换镜像、改分支模型、Rexyn 接口面变化），必须同批更新：
 
-1. `PROJECT-GROUP-MEMORY.md`（事实层）
-2. 两本书对应章节（叙述层，映射表见 `PROJECT-GROUP-MEMORY.md` 第六节）
+1. 对应代码仓库的 `AGENTS.md`（精简结论与边界）
+2. 两本书对应章节（详细设计与原理；映射见各仓库 `AGENTS.md` 的「文档映射」）
 
 不允许"下周补文档"。

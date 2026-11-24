@@ -72,5 +72,5 @@ npm run serve        # 预览构建产物
 ## 相关
 
 - 配套电子书：《Devtron 编译 + 本地部署》（`../Tutorial-CompileDeployDevtron`）
-- 项目群共用记忆：`../../PROJECT-GROUP-MEMORY.md`（11 个仓库清单、`rexyn-dev` 基线、文档同步契约）
+- 项目群约定：各代码仓库根目录的 `AGENTS.md`（仓库清单、`rexyn-dev` 基线、硬规则）+ 本仓库 `AGENTS.md`（文档同步契约）
 - 内容基于 Devtron 2.2.1，运行环境为 k3s v1.37.2+k3s1（Kubernetes 1.37）

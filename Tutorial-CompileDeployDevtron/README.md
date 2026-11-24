@@ -48,5 +48,5 @@ docs/
 ## 相关
 
 - 配套电子书：《Devtron 源码剖析与二次开发》（`../Tutorial-DevelopDevtron`）
-- 项目群共用记忆：`../../PROJECT-GROUP-MEMORY.md`（11 个仓库清单、`rexyn-dev` 基线、文档同步契约）
+- 项目群约定：各代码仓库根目录的 `AGENTS.md`（仓库清单、`rexyn-dev` 基线、硬规则）+ 文档仓库 `AGENTS.md`（同步契约）
 - 实测环境：OrbStack 2.2.5 / k3s v1.37.2+k3s1 / Devtron 2.2.1 / Ubuntu 24.04 arm64
