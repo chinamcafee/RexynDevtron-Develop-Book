@@ -54,6 +54,7 @@ Devtron fork（k3s/k8s 应用交付控制平面）   ← 本项目
 | --- | --- | --- |
 | 仓库增删 / 分支模型 | `overview`、`rexyn-branch-strategy` | `repos`、`branch-strategy` |
 | Rexyn 定位 / 接口面 | `rexyn-positioning` | `architecture` |
+| 云资源接管 / 机器与集群来源 | `rexyn-cloud-layers` | `cluster`（集群来源说明） |
 | 后端 API / 错误码 | `devtron-api`、`backend-error-codes` | — |
 | 业务域 / wire / 内置 chart | `devtron-domain`、`devtron-wire`、`devtron-inner-charts` | `workflow`、`deploy` |
 | 微服务 | `repo-services` + `svc-*` | `build-services` |

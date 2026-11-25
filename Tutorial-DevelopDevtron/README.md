@@ -59,6 +59,7 @@ npm run serve        # 预览构建产物
 
 第七部分 · RexynOps 定制
   rexyn-positioning      Devtron 在 RexynOps 版图中的位置
+  rexyn-cloud-layers     Devtron 之下：从"只有云账号"到"可部署的集群"
   rexyn-branch-strategy  rexyn-dev 分支模型与上游同步
 ```
 

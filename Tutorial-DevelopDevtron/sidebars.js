@@ -66,7 +66,7 @@ const sidebars = {
       type: 'category',
       label: '第七部分 · RexynOps 定制',
       collapsed: false,
-      items: ['rexyn-positioning', 'rexyn-branch-strategy'],
+      items: ['rexyn-positioning', 'rexyn-cloud-layers', 'rexyn-branch-strategy'],
     },
   ],
 };

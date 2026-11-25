@@ -6,6 +6,15 @@ sidebar_position: 1
 
 # 用 OrbStack 搭三节点 k3s 1.37
 
+:::note 生产集群不必从 OrbStack 开始
+本章用 OrbStack 在本机搭三节点，目的是**可重复地验证**编译产物。真实环境里集群有两种来源：
+
+- **已有集群**：只要拿到 kubeconfig，直接跳到[部署 Devtron](./deploy)；
+- **从零装机**：由 RexynOps 在已接管的云主机上先跑 `k3s` recipe，再跑 `devtron` recipe。
+
+两条路的区别只在"谁装 K3s"，Devtron 自身的安装参数、chart values、验证步骤完全相同。后一条路的细节见《源码剖析与二次开发》第七部分 `rexyn-cloud-layers`（Devtron 之下：从"只有云账号"到"可部署的集群"）。
+:::
+
 ## 0. 先记住两个 1.37 特有的坑
 
 在动手之前先看这两条，能省掉一次重装：

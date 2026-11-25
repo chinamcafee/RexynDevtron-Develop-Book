@@ -1,7 +1,7 @@
 ---
 id: rexyn-branch-strategy
 title: rexyn-dev 分支模型与上游同步
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # rexyn-dev 分支模型与上游同步
