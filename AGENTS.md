@@ -8,6 +8,27 @@
 - **允许直接在 `main` 上提交与推送**，不需要 `rexyn-dev`（这是全项目群唯一的例外）。
 - 忽略：`node_modules/`、`build/`、`.docusaurus/`、`.cache-loader/`、日志与系统文件。
 
+## 与 RexynOpsProjects 的关系
+
+本项目不是独立的 Devtron 发行版，而是 **RexynOps 的执行层**。`DevtronProjects` 下所有仓库 fork 自上游 Devtron 并做深度二次开发，目的只有一个：把 Devtron 的应用交付与 K8s 集群资源能力，接进 `RexynOpsProjects` 这个"AI 全自主的公有云运维 Agent"。
+
+```text
+RexynDesktop（运维工作台 / HITL）
+RexynControlPlane（编排 / 策略 / 审批 / 跨云 Provider）
+        │  REST API / Webhook / GitOps
+Devtron fork（k3s/k8s 应用交付控制平面）   ← 本项目
+        │  Argo CD / Helm / K8s API
+目标 k3s / k8s 集群
+```
+
+- **上游**：保持与 Devtron 官方仓库可同步；定制只落 `rexyn-dev`，不向上游提 PR。
+- **下游**：RexynOps 通过 Devtron API（`/orchestrator/...`）、Webhook 与 GitOps 仓库获取事实、触发部署/回滚；RexynDesktop 可将 Devtron Dashboard 作为受管 Web 控制台打开（内置浏览器 / Browser Use），RexynControlPlane 则直接调用 API。
+- **分工**：AI 推理、策略与审批、跨云采购、证据与审计在 RexynOps 侧；本项目只做**确定性执行与事实回传**，不内置 RexynOps 的模型与策略，也不替代 Argo CD。
+- **契约**：跨边界以 Devtron HTTP API 与 `contracts/error-codes.yaml`（`businessCode`/`params`）为准；RexynOps 不直连 Devtron 数据库。
+- **文档**：本仓库的定制与部署细节写在 `RexynDevtron-Develop-Book`；RexynOps 侧的系统设计写在 `RexynOpsProjects/docs/RexynOps-DevDocs`。
+
+**本仓库的角色**：Devtron fork 的执行层手册（源码剖析 + 编译部署），与 RexynOps 的架构文档是并列关系，不重复其决策。
+
 ## 2. 两本书的分工
 
 | 书 | 内容 | 目录 |
